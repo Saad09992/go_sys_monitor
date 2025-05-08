@@ -2,29 +2,37 @@ package monitor
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/DataDog/gopsutil/cpu"
 	"github.com/DataDog/gopsutil/host"
+	"github.com/DataDog/gopsutil/mem"
 )
 
 type HostInfo struct{
-	host string
-	uptime int64
-	os string
-	id string
+	Host string
+	Uptime int64
+	Os string
+	Id string
 }
 
 type CpuInfo struct{
-	core int
-	model string
-	usage int64
+	Core int
+	Model string
+	Usage int64
 }
 
-// strconv.FormatUint(vmStat.Free/megabyteDiv, 10)
+type MemInfo struct{
+	Total float64
+	Used float64
+	Percentage float64
+	Free float64
+}
 
-const megabyteDiv uint64 = 1024 * 1024
-const gigabyteDiv uint64 = megabyteDiv * 1024
+
+const megabyte uint64 = 1024 * 1024
+const gigabyte uint64 = megabyte * 1024
 
 func GetHostInfo()(HostInfo, error){
 	var hostInfo HostInfo
@@ -33,10 +41,10 @@ func GetHostInfo()(HostInfo, error){
 		fmt.Printf("Error fetching host info, %v", err)
 		return hostInfo,err
 	}
-	hostInfo.host=info.Hostname
-	hostInfo.uptime=int64(info.Uptime)
-	hostInfo.os=info.Platform
-	hostInfo.id=info.HostID
+	hostInfo.Host=info.Hostname
+	hostInfo.Uptime=int64(info.Uptime/60)
+	hostInfo.Os=info.Platform
+	hostInfo.Id=info.HostID
 	return hostInfo, nil
 }
 
@@ -52,19 +60,33 @@ func GetCpuInfo()([]CpuInfo, error){
 		fmt.Printf("Error fetching cpu usage, %v \n", err)
 		return cpuInfo,nil
 	}
-
-
 	for i,val:=range info{
 		info:=CpuInfo{
-			core: int(val.CPU),
-			model: val.ModelName,
-			usage: int64(usage[i]),
+			Core: int(val.CPU),
+			Model: val.ModelName,
+			Usage: int64(usage[i]),
 
 		}
-		fmt.Printf("CPU info: %v \n", info)
 		cpuInfo=append(cpuInfo, info)
 	}
 
 	
 	return cpuInfo,nil
 }
+
+func GetRamInfo() (MemInfo, error) {
+	var info MemInfo
+	memInfo, err := mem.VirtualMemory()
+	if err != nil {
+		fmt.Printf("Error fetching mem info: %v", err)
+		return info, err
+	}
+	info = MemInfo{
+		Total: math.Round((float64(memInfo.Total)/float64(megabyte))*100) / 100,
+        Used: math.Round((float64(memInfo.Used)/float64(megabyte))*100) / 100,
+        Free: math.Round((float64(memInfo.Free)/float64(megabyte))*100) / 100,
+        Percentage: math.Round(memInfo.UsedPercent*100) / 100,
+    }
+	return info, nil
+}
+
